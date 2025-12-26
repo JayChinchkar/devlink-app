@@ -1,20 +1,36 @@
 const jwt = require('jsonwebtoken');
 
 exports.githubCallback = (req, res) => {
-  // Passport attaches the user to req.user
-  const user = req.user;
+  try {
+    const user = req.user;
 
-  // Create a JWT token - ADDING AVATAR HERE
-  const token = jwt.sign(
-    { 
-      id: user._id, 
-      username: user.username,
-      avatar: user.avatar // <--- CRITICAL FIX: Add this line
-    },
-    process.env.JWT_SECRET,
-    { expiresIn: '7d' }
-  );
+    if (!user) {
+      console.error("❌ No user found in request");
+      return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?error=auth_failed`);
+    }
 
-  // Redirect to frontend with the token in the URL
-  res.redirect(`http://localhost:5173?token=${token}`);
+    const token = jwt.sign(
+      { id: user._id, username: user.username, avatar: user.avatar },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    // Explicitly check if the env var is being read
+    const frontendUrl = process.env.FRONTEND_URL;
+    
+    if (!frontendUrl) {
+      console.warn("⚠️ FRONTEND_URL env var is missing! Defaulting to localhost.");
+    }
+
+    const finalDestination = frontendUrl || 'http://localhost:5173';
+
+    console.log(`🚀 Redirecting user ${user.username} to ${finalDestination}`);
+    
+    // Most SPA apps handle the token on the root route
+    res.redirect(`${finalDestination}?token=${token}`);
+
+  } catch (err) {
+    console.error("Auth Controller Error:", err);
+    res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?error=server_error`);
+  }
 };
